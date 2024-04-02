@@ -1,21 +1,38 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+useHead({title: 'Product List'})
 
 const columns = [{
   key: 'id',
-  label: 'ID'
-}, {
-  key: 'name',
-  label: 'Name'
+  label: 'ID',
+  sortable: true
 }, {
   key: 'title',
-  label: 'Title'
+  label: 'Title',
+  sortable: true
 }, {
-  key: 'email',
-  label: 'Email'
+  key: 'description',
+  label: 'Description',
+  sortable: true
 }, {
-  key: 'role',
-  label: 'Role'
+  key: 'price',
+  label: 'Price',
+  sortable: true
+}, {
+  key: 'rating',
+  label: 'Rating',
+  sortable: true
+},{
+  key: 'brand',
+  label: 'Brand',
+  sortable: true
+}, {
+  key: 'category',
+  label: 'Category',
+  sortable: true
+}, {
+  key: 'thumbnail',
+  label: 'Thumbnail',
+  sortable: true
 }]
 
 const people = ref([{
@@ -56,38 +73,78 @@ const people = ref([{
   role: 'Member'
 }])
 
-const page = ref(1)
-const pageCount = 5
 
-const q = ref('')
+const { data } = await useFetch<any>('https://dummyjson.com/products');
+let productsList = data.value.products;
 
-const filteredRows = computed(() => {
-  if (!q.value) {
-    return people.value
-  }
+const q = ref('');
+const page = ref(1);
+const pageCount = 5;
+const sort = ref({ column: 'title', direction: 'asc' as const })
+const sortedRows = computed(() => {
+  const sortedProducts = [...productsList]
+  const { column, direction } = sort.value
 
-  return people.value.filter((person) => {
-    return Object.values(person).some((value) => {
-      return String(value).toLowerCase().includes(q.value.toLowerCase())
+  if (column && direction) {
+    sortedProducts.sort((a, b) => {
+      const aValue = a[column]
+      const bValue = b[column]
+      if (aValue < bValue) return direction === 'asc' ? -1 : 1
+      if (aValue > bValue) return direction === 'asc' ? 1 : -1
+      return 0
     })
-  })
-})
+  }
+  return sortedProducts
+});
 
-const paginatedRows = computed(() => {
-  return filteredRows.value.slice((page.value - 1) * pageCount, page.value * pageCount)
-})
+
+const rows = computed(() => {
+  let filteredProducts = [...sortedRows.value]
+  if (q.value) {
+    filteredProducts = filteredProducts.filter(product => {
+      return Object.values(product).some(value => {
+        return String(value).toLowerCase().includes(q.value.toLowerCase())
+      })
+    })
+  }
+  const startIndex = (page.value - 1) * pageCount
+  const endIndex = startIndex + pageCount
+  return filteredProducts.slice(startIndex, endIndex)
+});
+
+
 </script>
 
 <template>
+
   <div>
     <div class="flex px-3 py-3.5 border-b border-gray-200 dark:border-gray-700">
       <UInput v-model="q" placeholder="Filter people..." />
     </div>
 
-    <UTable :rows="paginatedRows" :columns="columns" />
+    <UTable :rows="rows" :columns="columns"  v-model:sort="sort" sort-mode="manual">
+      <template #thumbnail-data="{row}">
+        <img :src="row.thumbnail" alt="" class="w-[100px] h-[100px]">
+      </template>
+      <template #description-data="{row}">
+        <div class="text-wrap">{{ row.description }}</div>
+      </template>
 
-    <div class="flex justify-end px-3 py-3.5 border-t border-gray-200 dark:border-gray-700">
-      <UPagination v-model="page" :page-count="pageCount" :total="filteredRows.length" />
+      <template>
+        <UTable :sort="sortedRows" :columns="sortedRows" :rows="sortedRows" />
+      </template>
+
+      <!-- Rating cell -->
+      <template #rating-data="{row}">
+        <div :class="{ 'bg-red-500/40': row.rating < 4.5, 'bg-green-500/40': row.rating >= 4.5 }" class="px-3 py-2">
+          {{ row.rating }}
+
+        </div>
+      </template>
+
+    </UTable>
+    <div class="flex justify-center px-3 py-3.5 border-t border-gray-200 dark:border-gray-700">
+      <UPagination v-model="page" :page-count="pageCount" :total="productsList.length" />
     </div>
   </div>
 </template>
